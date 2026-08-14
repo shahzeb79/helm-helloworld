@@ -1,5 +1,5 @@
 # common values at global level. 
-namespace: hello
+namespace: testns
 
 # micro-service specific values inside each service subsection.
 hello:
