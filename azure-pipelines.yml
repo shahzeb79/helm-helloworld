@@ -1,8 +1,3 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
-
 trigger:
 - master
 
@@ -10,17 +5,22 @@ pool:
   vmImage: ubuntu-latest
 
 variables:
-  imageName : 'pipelines-helloworld-docker'
+  # Name of your repository in ACR
+  imageName: 'helloworld-nodejs-app'
 
 steps:
-- script: echo Building a docker image for Hello, world!
-  displayName: 'Building a docker image for Hello, world'
+- script: echo Building and pushing Docker image to Azure Container Registry...
+  displayName: 'Build and Push Notice'
 
 - task: Docker@2
-  displayName: Build an image
+  displayName: 'Build and push image to ACR'
   inputs:
-    containerRegistry: 'Docker Hub Registry with Token'
-    repository: 'a5hut0sh/$(imageName)'
+    # 1. Select Azure Container Registry as the container provider type
+    containerRegistry: 'acrconnection' # Replace with your Azure DevOps Service Connection name
+    # 2. Set the repository name (no dockerhub username required for ACR)
+    repository: '$(imageName)'
     command: 'buildAndPush'
     Dockerfile: 'helloworld-nodejs-app/Dockerfile'
-    tags: '1.0'
+    tags: |
+      1.0
+      latest
