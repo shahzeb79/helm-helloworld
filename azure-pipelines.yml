@@ -10,7 +10,7 @@ variables:
   aksCluster: 'testCluster'
   k8sNamespace: 'testns'
   releaseName: 'hello-world-app'
-  chartPath: '$(System.DefaultWorkingDirectory)/helm-charts/helloworld'
+  chartPath: '$(System.DefaultWorkingDirectory)/helm-chart/helloworld'
 
 steps:
 # 1. Install Helm binary on the build agent
