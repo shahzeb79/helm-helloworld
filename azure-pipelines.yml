@@ -5,33 +5,40 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  azureServiceConnection: 'Azure subscription' # Name of your Azure RM Service Connection
+  azureServiceConnection: 'Azure subscription'
   resourceGroup: 'testRG'
   aksCluster: 'testCluster'
-  k8sNamespace: 'testns'
-  releaseName: 'hello-world-app'
   chartPath: '$(System.DefaultWorkingDirectory)/helm-chart/helloworld'
 
-steps:
-# 1. Install Helm binary on the build agent
-- task: HelmInstaller@1
-  displayName: 'Install Helm'
-  inputs:
-    helmVersionToInstall: 'latest'
+stages:
+# STAGE 1: DEV (Runs automatically)
+- stage: DeployDev
+  displayName: 'Deploy to DEV'
+  jobs:
+  - template: build-template.yml
+    parameters:
+      environmentName: 'dev'
+      k8sNamespace: 'dev-ns'
+      releaseName: 'hello-world-app-dev'
 
-# 2. Get AKS credentials and run Helm upgrade/install
-- task: AzureCLI@2
-  displayName: 'Deploy Helm Chart to AKS'
-  inputs:
-    azureSubscription: '$(azureServiceConnection)'
-    scriptType: 'bash'
-    scriptLocation: 'inlineScript'
-    inlineScript: |
-      # 1. Get credentials for AKS cluster
-      az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster) --overwrite-existing
-      
-      # 2. Deploy or upgrade the Helm release
-      helm upgrade --install $(releaseName) $(chartPath) \
-        --namespace $(k8sNamespace) \
-        --create-namespace \
-        -f $(chartPath)/values.yaml
+# STAGE 2: QA (Waits for QA approval in Azure DevOps Environments UI)
+- stage: DeployQA
+  displayName: 'Deploy to QA'
+  dependsOn: DeployDev
+  jobs:
+  - template: build-template.yml
+    parameters:
+      environmentName: 'qa'
+      k8sNamespace: 'qa-ns'
+      releaseName: 'hello-world-app-qa'
+
+# STAGE 3: PROD (Waits for PROD approval in Azure DevOps Environments UI)
+- stage: DeployProd
+  displayName: 'Deploy to PROD'
+  dependsOn: DeployQA
+  jobs:
+  - template: build-template.yml
+    parameters:
+      environmentName: 'prod'
+      k8sNamespace: 'prod-ns'
+      releaseName: 'hello-world-app-prod'
