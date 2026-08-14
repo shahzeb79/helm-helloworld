@@ -5,7 +5,6 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  # Name of your Azure Resource Manager Service Connection in Azure DevOps
   azureServiceConnection: 'Azure subscription'
   resourceGroup: 'testRG'
   aksCluster: 'testCluster'
@@ -18,109 +17,116 @@ stages:
 - stage: DeployDev
   displayName: 'Deploy to DEV'
   jobs:
-  - deployment: DeployDevJob
-    displayName: 'Deploy to DEV Environment'
-    environment: 'dev'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - checkout: self
+  - job: DeployDevJob
+    displayName: 'Deploy to DEV Namespace'
+    steps:
+    - checkout: self
 
-          - task: HelmInstaller@1
-            displayName: 'Install Helm'
-            inputs:
-              helmVersionToInstall: 'latest'
+    - task: HelmInstaller@1
+      displayName: 'Install Helm'
+      inputs:
+        helmVersionToInstall: 'latest'
 
-          - task: AzureCLI@2
-            displayName: 'Deploy Helm to DEV Namespace'
-            inputs:
-              azureSubscription: '$(azureServiceConnection)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                # 1. Get AKS credentials
-                az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster) --overwrite-existing
-
-                # 2. Deploy Helm release to dev namespace
-                helm upgrade --install hello-world-app-dev $(chartPath) \
-                  --namespace testns \
-                  --create-namespace \
-                  -f $(chartPath)/values.yaml \
-                  --set namespace=testns
+    - task: AzureCLI@2
+      displayName: 'Deploy Helm to DEV'
+      inputs:
+        azureSubscription: '$(azureServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster) --overwrite-existing
+          helm upgrade --install hello-world-app-dev $(chartPath) \
+            --namespace testns \
+            --create-namespace \
+            -f $(chartPath)/values.yaml \
+            --set namespace=testns
 
 # ==========================================
-# STAGE 2: QA (Requires Approval via Environment: qa)
+# STAGE 2: QA
 # ==========================================
 - stage: DeployQA
   displayName: 'Deploy to QA'
   dependsOn: DeployDev
   jobs:
-  - deployment: DeployQAJob
-    displayName: 'Deploy to QA Environment'
-    environment: 'qa' # Triggers manual approval check set up in Azure DevOps Environments UI
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - checkout: self
+  # 1. Manual Approval Step for QA
+  - job: ApproveQA
+    displayName: 'Approve QA Deployment'
+    pool: server # Server jobs run on Azure DevOps without taking a build agent
+    steps:
+    - task: ManualValidation@0
+      displayName: 'Manual Approval for QA'
+      inputs:
+        notifyUsers: 'your-email@domain.com' # Optional: Add email to notify
+        instructions: 'Please validate DEV deployment and approve to proceed to QA.'
+        onTimeout: 'reject'
 
-          - task: HelmInstaller@1
-            displayName: 'Install Helm'
-            inputs:
-              helmVersionToInstall: 'latest'
+  # 2. Deployment Step for QA (Runs after approval)
+  - job: DeployQAJob
+    displayName: 'Deploy to QA Namespace'
+    dependsOn: ApproveQA
+    steps:
+    - checkout: self
 
-          - task: AzureCLI@2
-            displayName: 'Deploy Helm to QA Namespace'
-            inputs:
-              azureSubscription: '$(azureServiceConnection)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                # 1. Get AKS credentials
-                az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster) --overwrite-existing
+    - task: HelmInstaller@1
+      displayName: 'Install Helm'
+      inputs:
+        helmVersionToInstall: 'latest'
 
-                # 2. Deploy Helm release to QA namespace
-                helm upgrade --install hello-world-app-qa $(chartPath) \
-                  --namespace qa-ns \
-                  --create-namespace \
-                  -f $(chartPath)/values.yaml \
-                  --set namespace=qa-ns
+    - task: AzureCLI@2
+      displayName: 'Deploy Helm to QA'
+      inputs:
+        azureSubscription: '$(azureServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster) --overwrite-existing
+          helm upgrade --install hello-world-app-qa $(chartPath) \
+            --namespace qa-ns \
+            --create-namespace \
+            -f $(chartPath)/values.yaml \
+            --set namespace=qa-ns
 
 # ==========================================
-# STAGE 3: PROD (Requires Approval via Environment: prod)
+# STAGE 3: PROD
 # ==========================================
 - stage: DeployProd
   displayName: 'Deploy to PROD'
   dependsOn: DeployQA
   jobs:
-  - deployment: DeployProdJob
-    displayName: 'Deploy to PROD Environment'
-    environment: 'prod' # Triggers manual approval check set up in Azure DevOps Environments UI
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - checkout: self
+  # 1. Manual Approval Step for PROD
+  - job: ApproveProd
+    displayName: 'Approve PROD Deployment'
+    pool: server # Server jobs run on Azure DevOps without taking a build agent
+    steps:
+    - task: ManualValidation@0
+      displayName: 'Manual Approval for PROD'
+      inputs:
+        notifyUsers: 'your-email@domain.com' # Optional: Add email to notify
+        instructions: 'Please validate QA deployment and approve to proceed to Production.'
+        onTimeout: 'reject'
 
-          - task: HelmInstaller@1
-            displayName: 'Install Helm'
-            inputs:
-              helmVersionToInstall: 'latest'
+  # 2. Deployment Step for PROD (Runs after approval)
+  - job: DeployProdJob
+    displayName: 'Deploy to PROD Namespace'
+    dependsOn: ApproveProd
+    steps:
+    - checkout: self
 
-          - task: AzureCLI@2
-            displayName: 'Deploy Helm to PROD Namespace'
-            inputs:
-              azureSubscription: '$(azureServiceConnection)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                # 1. Get AKS credentials
-                az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster) --overwrite-existing
+    - task: HelmInstaller@1
+      displayName: 'Install Helm'
+      inputs:
+        helmVersionToInstall: 'latest'
 
-                # 2. Deploy Helm release to PROD namespace
-                helm upgrade --install hello-world-app-prod $(chartPath) \
-                  --namespace prod-ns \
-                  --create-namespace \
-                  -f $(chartPath)/values.yaml \
-                  --set namespace=prod-ns
+    - task: AzureCLI@2
+      displayName: 'Deploy Helm to PROD'
+      inputs:
+        azureSubscription: '$(azureServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster) --overwrite-existing
+          helm upgrade --install hello-world-app-prod $(chartPath) \
+            --namespace prod-ns \
+            --create-namespace \
+            -f $(chartPath)/values.yaml \
+            --set namespace=prod-ns
