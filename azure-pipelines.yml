@@ -2,25 +2,54 @@ trigger:
 - master
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'ubuntu-latest'
 
 variables:
-  # Name of your repository in ACR
-  imageName: 'helloworld-nodejs-app'
+  # Name of your Azure DevOps Kubernetes Service Connection
+  kubernetesServiceConnection: 'aksconnection'
+  
+  # Target namespace on AKS (overrides or aligns with values.yaml)
+  k8sNamespace: 'testns'
+  
+  # Name for this Helm release
+  helmReleaseName: 'hello-world-app'
+  
+  # Path to your Helm chart directory in the repo
+  chartPath: '$(System.DefaultWorkingDirectory)/helm-chart/helloworld'
 
 steps:
-- script: echo Building and pushing Docker image to Azure Container Registry...
-  displayName: 'Build and Push Notice'
-
-- task: Docker@2
-  displayName: 'Build and push image to ACR'
+# Step 1: Install Helm on the build agent
+- task: HelmInstaller@1
+  displayName: 'Install Helm'
   inputs:
-    # 1. Select Azure Container Registry as the container provider type
-    containerRegistry: 'acrconnection' # Replace with your Azure DevOps Service Connection name
-    # 2. Set the repository name (no dockerhub username required for ACR)
-    repository: '$(imageName)'
-    command: 'buildAndPush'
-    Dockerfile: 'helloworld-nodejs-app/Dockerfile'
-    tags: |
-      1.0
-      latest
+    helmVersionToInstall: 'latest'
+
+# Step 2: Ensure the target namespace exists in AKS
+- task: KubernetesManifest@0
+  displayName: 'Create Namespace if not exists'
+  inputs:
+    action: 'deploy'
+    kubernetesServiceConnection: '$(kubernetesServiceConnection)'
+    manifests: |
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: $(k8sNamespace)
+
+# Step 3: Package and Upgrade/Install the Helm chart onto AKS
+- task: HelmDeploy@2
+  displayName: 'Deploy Helm Chart to AKS'
+  inputs:
+    connectionType: 'Azure Resource Manager'
+    azureSubscriptionEndpoint: 'Azure subscription' # Your Azure Subscription Connection
+    azureResourceGroup: 'testRG'                                 # Your AKS Resource Group
+    kubernetesCluster: 'testCluster'                                # Your AKS Cluster Name
+    namespace: '$(k8sNamespace)'
+    command: 'upgrade'
+    chartType: 'FilePath'
+    chartPath: '$(chartPath)'
+    releaseName: '$(helmReleaseName)'
+    valueFile: '$(chartPath)/values.yaml'
+    install: true
+    recreate: false
+    resetValues: false
