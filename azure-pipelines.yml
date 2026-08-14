@@ -35,7 +35,7 @@ stages:
         scriptLocation: 'inlineScript'
         inlineScript: |
           az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster) --overwrite-existing
-          helm upgrade --install hello-world-app-dev $(chartPath) \
+          helm upgrade --install hello-world-app $(chartPath) \
             --namespace testns \
             --create-namespace \
             -f $(chartPath)/values.yaml \
@@ -80,7 +80,7 @@ stages:
         scriptLocation: 'inlineScript'
         inlineScript: |
           az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster) --overwrite-existing
-          helm upgrade --install hello-world-app-qa $(chartPath) \
+          helm upgrade --install hello-world-app $(chartPath) \
             --namespace qa-ns \
             --create-namespace \
             -f $(chartPath)/values.yaml \
@@ -125,7 +125,7 @@ stages:
         scriptLocation: 'inlineScript'
         inlineScript: |
           az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster) --overwrite-existing
-          helm upgrade --install hello-world-app-prod $(chartPath) \
+          helm upgrade --install hello-world-app $(chartPath) \
             --namespace prod-ns \
             --create-namespace \
             -f $(chartPath)/values.yaml \
