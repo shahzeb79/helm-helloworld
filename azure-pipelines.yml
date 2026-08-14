@@ -5,51 +5,33 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  # Name of your Azure DevOps Kubernetes Service Connection
-  kubernetesServiceConnection: 'aksconnection'
-  
-  # Target namespace on AKS (overrides or aligns with values.yaml)
+  azureServiceConnection: 'Azure subscription' # Name of your Azure RM Service Connection
+  resourceGroup: 'testRG'
+  aksCluster: 'testCluster'
   k8sNamespace: 'testns'
-  
-  # Name for this Helm release
-  helmReleaseName: 'hello-world-app'
-  
-  # Path to your Helm chart directory in the repo
-  chartPath: '$(System.DefaultWorkingDirectory)/helm-chart/helloworld'
+  releaseName: 'hello-world-app'
+  chartPath: '$(System.DefaultWorkingDirectory)/helm-charts/helloworld'
 
 steps:
-# Step 1: Install Helm on the build agent
+# 1. Install Helm binary on the build agent
 - task: HelmInstaller@1
   displayName: 'Install Helm'
   inputs:
     helmVersionToInstall: 'latest'
 
-# Step 2: Ensure the target namespace exists in AKS
-- task: KubernetesManifest@0
-  displayName: 'Create Namespace if not exists'
-  inputs:
-    action: 'deploy'
-    kubernetesServiceConnection: '$(kubernetesServiceConnection)'
-    manifests: |
-      apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: $(k8sNamespace)
-
-# Step 3: Package and Upgrade/Install the Helm chart onto AKS
-- task: HelmDeploy@2
+# 2. Get AKS credentials and run Helm upgrade/install
+- task: AzureCLI@2
   displayName: 'Deploy Helm Chart to AKS'
   inputs:
-    connectionType: 'Azure Resource Manager'
-    azureSubscriptionEndpoint: 'Azure subscription' # Your Azure Subscription Connection
-    azureResourceGroup: 'testRG'                                 # Your AKS Resource Group
-    kubernetesCluster: 'testCluster'                                # Your AKS Cluster Name
-    namespace: '$(k8sNamespace)'
-    command: 'upgrade'
-    chartType: 'FilePath'
-    chartPath: '$(chartPath)'
-    releaseName: '$(helmReleaseName)'
-    valueFile: '$(chartPath)/values.yaml'
-    install: true
-    recreate: false
-    resetValues: false
+    azureSubscription: '$(azureServiceConnection)'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      # 1. Get credentials for AKS cluster
+      az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster) --overwrite-existing
+      
+      # 2. Deploy or upgrade the Helm release
+      helm upgrade --install $(releaseName) $(chartPath) \
+        --namespace $(k8sNamespace) \
+        --create-namespace \
+        -f $(chartPath)/values.yaml
