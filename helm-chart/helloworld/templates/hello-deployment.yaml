@@ -19,7 +19,6 @@ spec:
       labels:
         app: {{ .Values.namespace }}
     spec: 
-      serviceAccountName: {{ .Values.namespace }}
       containers:
         - name: {{ .Values.namespace }}
           env: 
