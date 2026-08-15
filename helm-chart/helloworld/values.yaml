@@ -17,7 +17,7 @@ hello:
     requests:
       cpu: 100m
       memory: 128Mi
-  replicas: 3
+  replicas: 1
   service:
     type: ClusterIP
     port: 80
