@@ -81,10 +81,10 @@ stages:
         inlineScript: |
           az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster) --overwrite-existing
           helm upgrade --install hello-world-app $(chartPath) \
-            --namespace qa-ns \
+            --namespace qa \
             --create-namespace \
             -f $(chartPath)/values.yaml \
-            --set namespace=qa-ns
+            --set namespace=qa
 
 # ==========================================
 # STAGE 3: PROD
@@ -126,7 +126,7 @@ stages:
         inlineScript: |
           az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster) --overwrite-existing
           helm upgrade --install hello-world-app $(chartPath) \
-            --namespace prod-ns \
+            --namespace prod \
             --create-namespace \
             -f $(chartPath)/values.yaml \
-            --set namespace=prod-ns
+            --set namespace=prod
